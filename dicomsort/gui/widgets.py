@@ -113,7 +113,121 @@ class CustomDataTable(wx.grid.PyGridTableBase):
         return self.CanGetValueAs(row, col, typeName)
 
 
-class CheckListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin,
+class CheckListCtrl(wx.ListCtrl, TextEditMixin, ListCtrlAutoWidthMixin):
+    def __init__(self, parent):
+        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
+        ListCtrlAutoWidthMixin.__init__(self)
+
+        TextEditMixin.__init__(self)
+
+        self.EnableCheckBoxes()
+
+        # Keep track of the editable columns
+        self.editable_columns = set()
+
+        # Bind the edit event to prevent editing of the first column.
+        # Additionally we need this to allow the user to interact with
+        # the checkbox because when using the TextEditMixin, any
+        # mouse interaction with the checkbox is ignored.
+        self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.OnBeginLabelEdit)
+
+        self.InsertColumn(0, '')
+
+        # TODO: Make the first column fit to the checkbox
+        self.SetColumnWidth(0, wx.LIST_AUTOSIZE)
+
+    def OnBeginLabelEdit(self, event):
+        if event.GetColumn() == 0:
+            item = event.GetIndex()
+            # Toggle the checkbox
+            self.CheckItem(item, check=(not self.IsItemChecked(item)))
+            event.Veto()
+            return
+
+        # TODO: Check if this column is disabled?
+
+        event.Skip()
+
+    def SetColumnEditable(self, column, edit=True):
+        if edit:
+            self.editable_columns.add(column)
+        else:
+            self.editable_columns.remove(column)
+
+    def ClearColumn(self, column):
+        for row in range(self.ItemCount):
+            self.SetItem(row, column, '')
+
+    def SetStringItems(self, items):
+        self.DeleteAllItems()
+
+        for item in items:
+            if isinstance(item, str):
+                item = [item, ]
+
+            # Insert an empty item which is the checkbox column
+            row = self.InsertItem(self.GetItemCount() + 1, '')
+
+            for column, value in enumerate(item):
+                self.SetItem(row, column + 1, value)
+
+    def CheckItems(self, rows, check=True):
+        for row in rows:
+            self.CheckItem(row, check)
+
+    def GetCheckedItems(self, column=None):
+        return [self.GetItemList(column) for row in self._GetCheckedRows()]
+
+    def _GetCheckedRows(self):
+        return [row for row in range(self.ItemCount) if self.IsItemChecked(row)]
+
+    def UnCheckAll(self):
+        self.CheckItems(range(self.ItemCount), False)
+
+    def GetCheckedStrings(self, column=None):
+        return [self.GetStringItem(row, column) for row in self._GetCheckedRows()]
+
+    def FindStrings(self, strings, column=0):
+        strings = [six.ensure_text(string) for string in strings]
+
+        fields = [item.Text for item in self.GetItemList(column)]
+
+        indices = []
+
+        for string in strings:
+            try:
+                indices.append(fields.index(string))
+            except ValueError:
+                indices.append(None)
+
+        return indices
+
+    def GetItemList(self, column=None):
+        if column is None:
+            return [self.GetItemList(column) for column in range(self.ColumnCount)]
+
+        return [self.GetItem(row, column) for row in range(self.ItemCount)]
+
+    def GetStringItem(self, row, column=None):
+        if column is None:
+            return [self.GetStringItem(row, column) for column in range(self.ColumnCount)]
+
+        return self.GetItem(row, column).Text
+
+    '''
+    def OpenEditor(self, column, row):
+        if column not in self.editable_columns:
+            return
+
+        return TextEditMixin.OpenEditor(self, column, row)
+    '''
+
+
+
+
+
+
+class CheckListCtrlOld(wx.ListCtrl, ListCtrlAutoWidthMixin,
                     CheckListCtrlMixin, TextEditMixin):
 
     def __init__(self, parent):
@@ -150,7 +264,7 @@ class CheckListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin,
             row = self.InsertItem(self.GetItemCount() + 1, item[0])
 
             for col in range(1, len(item)):
-                self.SetStringItem(row, col, item[col])
+                self.SetItem(row, col, item[col])
 
     def CheckItems(self, itemIndex):
         [self.CheckItem(index) for index in itemIndex]

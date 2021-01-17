@@ -79,6 +79,9 @@ class TestAnonymizeList(WxTestCase):
             'Field3': '',
         }
 
+        import pdb
+        pdb.set_trace()
+
         assert a.GetAnonDict() == expected
 
     def test_get_dicom_field(self):
